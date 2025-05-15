@@ -1,84 +1,55 @@
-# Turborepo starter
+# My Turborepo
 
-This Turborepo starter is maintained by the Turborepo core team.
+Реализация невероятно сырая и не учитывает различные аспекты и нюансы аутентификации. Приложения и БД в докер обернул, но забыл добавить миграции БД, поэтому "из коробки" ничего не заработает 🫠
 
-## Using this example
+Swagger вертится на http://localhost:30000/api, фронтенд на http://localhost:3000.
 
-Run the following command:
+## Что внутри?
+
+- `apps/api`: Бэкенд с NestJS + Swagger + Zod + Postgres + Prisma
+- `apps/web`: Фронт на Next.js + Shadcn
+- `@repo/database`: Отдельный пакет под Prisma, который собирает клиента для `apps/api`
+- `@repo/crypto`: Обёртка над bcrypt (с фиксированным количеством раундов хэширования) для использования в `apps/api` и в `@repo/database` (в последнем необходима при сидировании БД)
+
+## Билдим локально:
+
+Сперва нужно передать переменные окружения приложениям:
+
+`.env` для `apps/api`:
 
 ```sh
-npx create-turbo@latest
+JWT_ACCESS_SECRET='some_secret'
+JWT_ACCESS_EXPIRE_SECONDS=900
+JWT_REFRESH_SECRET='another_secret'
+JWT_REFRESH_EXPIRE_SECONDS=604800
 ```
 
-## What's inside?
+`.env` для `apps/web`:
 
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-pnpm build
+```sh
+NEXT_PUBLIC_API_URL='http://localhost:30000'
 ```
 
-### Develop
+`.env` для `packages/database`:
 
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-pnpm dev
+```sh
+DATABASE_URL="postgresql://$MY_DB_USER:$MY_DB_PASSWORD@localhost:5432/$MY_DB_NAME"
 ```
 
-### Remote Caching
+После создания переменных окружения можно поднимать приложения:
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-npx turbo login
+```sh
+npm install
+docker-compose up postgres
+npx turbo db:migrate
+npx turbo dev
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+## Rambles:
+У меня не задалось с самого начала - изначально я начал собирать репозиторий с двумя приложухами, заинсталлил Prisma в NestJS, а потом увидел, что обязательно нужен ещё и пакет :) Потом сходу не получилось нормально импортировать содержимое пакета database в бэк - не сразу понял, что NestJS требует уже сбилженные пакеты.
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+Когда поднял бэк и начал конфигурировать - оказалось, что встроенный механизм аутентификации зависит от @passport, с которым я до этого не работал. Потом выяснилось, что из коробки там нет рефреш токенов (или я упустил этот момент в документации). С реализацией HttpOnly кукис тоже возникли проблемы - парсить токен из куков/писать его в `Response` нужно вручную (или, опять же, я не знаю какую-то магическую функцию/библиотечку).
 
-```
-npx turbo link
-```
+Ну и с клиентской частью тоже печально - из-за HttpOnly кукисов пришлось ковыряться с документацией Nextjs, в итоге сделал _далеко_ не так, как хотелось бы и __совсем__ не так, как нужно :) По хорошему там бы вынести защищённые маршруты в отдельную папку и в общем лейауте запрашивать с бэка /me, чтобы потом прокинуть эти данные в страницу. Тогда как раз имеет смысл SSR странички профиля, а вот страницу с пользователями оставить на клиентской загрузке данных.
 
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+В-общем, я пытался как мог, но имхо подобные шаблоны приложений создаются совсем не за пару дней, если реализовывать всё по уму. Я полноценную систему с RBAC и токенами (с учётом того, что юзал готовые библиотечки) создавал почти что месяц, пока не довёл большинство пользовательских сценариев до ума.
