@@ -1,7 +1,7 @@
 {
     "name": "@repo/db",
-    "version": "0.0.0",
-    "main": "./generated/prisma/index.js",
+    "version": "0.0.1",
+    "main": "./dist/index.js",
     "types": "./src/index.ts",
     "scripts": {
         "db:generate": "prisma generate",
@@ -11,12 +11,10 @@
         "studio": "prisma studio"
     },
     "dependencies": {
-        "@prisma/client": "^6.7.0",
-        "bcrypt": "^6.0.0"
+        "@prisma/client": "^6.7.0"
     },
     "devDependencies": {
-        "@repo/eslint-config": "*",
-        "@types/bcrypt": "^5.0.2",
+        "@repo/crypto": "*",
         "eslint": "^9.18.0",
         "prisma": "^6.7.0",
         "tsx": "^4.19.4",

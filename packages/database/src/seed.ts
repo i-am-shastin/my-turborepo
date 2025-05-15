@@ -1,36 +1,26 @@
-import type { Prisma } from '../generated/prisma/client';
-import { prisma } from './client';
-import { hash } from 'bcrypt';
+import type { Prisma } from '../dist/client';
+import { prisma } from '.';
+import { hash } from '@repo/crypto';
 
-const DEFAULT_USERS: Prisma.UserCreateInput[] = [
-    {
-        email: 'test1@example.com',
-        password: 'test1',
-    },
-    {
-        email: 'test2@example.com',
-        password: 'test2',
-    },
-    {
-        email: 'test3@example.com',
-        password: 'test3',
-    },
-];
+const DEFAULT_USERS: Prisma.UserCreateInput[] = Array.from({ length: 3 }, (_, i) => {
+    return {
+        email: `test${i + 1}@example.com`,
+        password: 'dummyuser',
+    };
+});
 
 void (async () => {
     try {
         await Promise.all(
-            DEFAULT_USERS.map(async (user) => {
-                const hashedPassword = await hash(user.password, 12);
-
+            DEFAULT_USERS.map(async ({ email, password }) => {
                 return prisma.user.upsert({
                     where: {
-                        email: user.email,
+                        email,
                     },
                     update: {},
                     create: {
-                        ...user,
-                        password: hashedPassword,
+                        email,
+                        password: await hash(password), // Thats okay even if we are setting same password for each user
                     },
                 });
             }),

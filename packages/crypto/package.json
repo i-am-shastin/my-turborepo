@@ -1,0 +1,11 @@
+{
+    "name": "@repo/crypto",
+    "version": "0.0.0",
+    "main": "./src/index.js",
+    "dependencies": {
+        "bcrypt": "^6.0.0"
+    },
+    "devDependencies": {
+        "@types/bcrypt": "^5.0.2"
+    }
+}

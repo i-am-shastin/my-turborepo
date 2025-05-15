@@ -29,6 +29,7 @@
             "persistent": true
         },
         "db:seed": {
+            "dependsOn": [ "^db:generate" ],
             "cache": false
         },
         "db:deploy": {
