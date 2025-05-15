@@ -1,88 +1,103 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { compare, hash } from 'bcrypt';
+import { compare, hash } from '@repo/crypto';
 
 import { CredentialsDto } from './dto/credentials.dto';
-import { UsersService } from '../users/users.service';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { PUBLIC_USER_FIELDS } from 'src/const';
 
 @Injectable()
 export class AuthService {
-    private static readonly JWT_ACCESS_SECRET_EXPIRE_IN = 900;
-    private static readonly JWT_REFRESH_SECRET_EXPIRE_IN = 604_800;
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly jwtService: JwtService,
+        private readonly configService: ConfigService<EnvironmentVariables>,
+    ) {}
 
-    constructor(private readonly usersService: UsersService, private jwtService: JwtService, private configService: ConfigService) {}
+    async signUp({ email, password }: CredentialsDto) {
+        const hashedPassword = await hash(password);
+        const newUser = await this.prisma.user.create({
+            data: {
+                email,
+                password: hashedPassword,
+            },
+        });
 
-    async signUp(credentials: CredentialsDto) {
-        const hashedPassword = await hash(credentials.password, 12);
-        const newUser = await this.usersService.create(credentials.email, hashedPassword);
-
-        const tokens = await this.getTokens(newUser.id, newUser.email);
-        await this.updateRefreshToken(newUser.id, tokens.refresh.value);
-        return tokens;
+        return this.bakeTastyCookies(newUser.id, newUser.email);
     }
 
-    async signIn(credentials: CredentialsDto) {
-        const user = await this.usersService.findByEmail(credentials.email);
+    async signIn({ email, password }: CredentialsDto) {
+        const user = await this.prisma.user.findUnique({
+            where: { email },
+        });
+
         if (!user) {
             throw new UnauthorizedException();
         }
 
-        const isPasswordValid = await compare(credentials.password, user.password);
+        const isPasswordValid = await compare(password, user.password);
         if (!isPasswordValid) {
             throw new UnauthorizedException();
         }
 
-        const tokens = await this.getTokens(user.id, user.email);
-        await this.updateRefreshToken(user.id, tokens.refresh.value);
-        return tokens;
+        return this.bakeTastyCookies(user.id, user.email);
     }
 
-    async refresh(user?: Express.User) {
-        if (!user) {
+    async refresh(id: number | undefined, token: string) {
+        if (!id) {
             throw new UnauthorizedException();
         }
 
-        const tokens = await this.getTokens(user.sub, user.email);
-        await this.updateRefreshToken(user.sub, tokens.refresh.value);
-        return tokens;
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user || !user.refreshToken) {
+            throw new UnauthorizedException();
+        }
+
+        const isRefreshTokenValid = await compare(token, user.refreshToken);
+        if (!isRefreshTokenValid) {
+            throw new UnauthorizedException();
+        }
+
+        return this.bakeTastyCookies(id, user.email);
     }
 
-    async updateRefreshToken(id: number, refreshToken: string) {
-        return this.usersService.update(id, {
-            refreshToken: await hash(refreshToken, 12),
+    private async bakeTastyCookies(id: number, email: string) {
+        const cookies = await this.getJWTCookies(id, email);
+
+        await this.prisma.user.update({
+            where: { id },
+            data: {
+                refreshToken: await hash(cookies.refresh_token.value),
+            },
+            select: PUBLIC_USER_FIELDS,
         });
+
+        return cookies;
     }
 
-    async getTokens(sub: number, email: string) {
+    private async getJWTCookies(sub: number, email: string) {
         const payload = { sub, email };
 
-        const [accessToken, refreshToken] = await Promise.all([
-            this.jwtService.signAsync(
-                payload,
-                {
-                    secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-                    expiresIn: AuthService.JWT_ACCESS_SECRET_EXPIRE_IN,
-                },
-            ),
-            this.jwtService.signAsync(
-                payload,
-                {
-                    secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-                    expiresIn: AuthService.JWT_REFRESH_SECRET_EXPIRE_IN,
-                },
-            ),
-        ]);
-
         return {
-            access: {
-                value: accessToken,
-                maxAge: AuthService.JWT_ACCESS_SECRET_EXPIRE_IN * 1000,
-            },
-            refresh: {
-                value: refreshToken,
-                maxAge: AuthService.JWT_REFRESH_SECRET_EXPIRE_IN * 1000,
-            },
+            access_token: await this.createCookie(
+                payload,
+                this.configService.getOrThrow('JWT_ACCESS_SECRET'),
+                this.configService.getOrThrow('JWT_ACCESS_EXPIRE_SECONDS'),
+            ),
+            refresh_token: await this.createCookie(
+                payload,
+                this.configService.getOrThrow('JWT_REFRESH_SECRET'),
+                this.configService.getOrThrow('JWT_REFRESH_EXPIRE_SECONDS'),
+            ),
+        };
+    }
+
+    private async createCookie(payload: JwtPayload, secret: string | Buffer<ArrayBufferLike>, expiresIn: number) {
+        const value = await this.jwtService.signAsync(payload, { secret, expiresIn: `${expiresIn}s` });
+        return {
+            value,
+            maxAge: expiresIn * 1000,
         };
     }
 }

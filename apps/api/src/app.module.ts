@@ -8,7 +8,13 @@ import { UsersModule } from './users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-    imports: [ConfigModule.forRoot(), CacheModule.register({ isGlobal: true }), AuthModule, UsersModule, PrismaModule],
+    imports: [
+        ConfigModule.forRoot({ isGlobal: true }),
+        CacheModule.register({ isGlobal: true }),
+        AuthModule,
+        UsersModule,
+        PrismaModule,
+    ],
     controllers: [],
     providers: [{
         provide: APP_INTERCEPTOR,

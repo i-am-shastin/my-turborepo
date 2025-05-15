@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Res, Req, UseGuards, HttpCode, UsePipes } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiCookieAuth, ApiCreatedResponse, ApiInternalServerErrorResponse, ApiOkResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiCookieAuth, ApiCreatedResponse, ApiInternalServerErrorResponse, ApiOkResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 
 import { AuthService } from './auth.service';
@@ -8,6 +8,7 @@ import { RefreshTokenGuard } from './guards/refresh-token.guard';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 @Controller('auth')
+@ApiTags('Auth')
 @ApiInternalServerErrorResponse({ description: 'Internal server error' })
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
@@ -17,8 +18,8 @@ export class AuthController {
     @ApiBadRequestResponse({ description: 'Invalid payload or user already exists' })
     @UsePipes(ZodValidationPipe)
     async signUp(@Body() credentials: CredentialsDto, @Res({ passthrough: true }) response: Response) {
-        const tokens = await this.authService.signUp(credentials);
-        AuthController.writeResponseCookies(response, tokens);
+        const cookies = await this.authService.signUp(credentials);
+        AuthController.writeCookiesTo(response, cookies);
     }
 
     @Post('login')
@@ -27,8 +28,8 @@ export class AuthController {
     @HttpCode(200)
     @UsePipes(ZodValidationPipe)
     async signIn(@Body() credentials: CredentialsDto, @Res({ passthrough: true }) response: Response) {
-        const tokens = await this.authService.signIn(credentials);
-        AuthController.writeResponseCookies(response, tokens);
+        const cookies = await this.authService.signIn(credentials);
+        AuthController.writeCookiesTo(response, cookies);
     }
 
     @UseGuards(RefreshTokenGuard)
@@ -37,13 +38,18 @@ export class AuthController {
     @ApiUnauthorizedResponse({ description: 'Invalid or stale refresh_token' })
     @ApiCookieAuth('refresh_token')
     async refresh(@Req() req: Request, @Res({ passthrough: true }) response: Response) {
-        const tokens = await this.authService.refresh(req.user);
-        AuthController.writeResponseCookies(response, tokens);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        const cookies = await this.authService.refresh(req.user?.sub, req.cookies['refresh_token']); // It has to be valid due to ApiCookieAuth decorator
+        AuthController.writeCookiesTo(response, cookies);
     }
 
-    private static writeResponseCookies(response: Response, tokens: Record<string, { value: string; maxAge: number }>) {
-        for (const [name, data] of Object.entries(tokens)) {
-            response.cookie(`${name}_token`, data.value, { httpOnly: true, maxAge: data.maxAge });
+    private static writeCookiesTo(response: Response, cookies: Record<string, { value: string; maxAge: number }>) {
+        for (const [name, data] of Object.entries(cookies)) {
+            response.cookie(name, data.value, {
+                httpOnly: true,
+                maxAge: data.maxAge,
+                // insecure, no restrictions, no predefined path
+            });
         }
     }
 }

@@ -4,28 +4,19 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 
-type JwtPayload = {
-    sub: string;
-    username: string;
-};
-
 @Injectable()
 export class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt-access') {
-    constructor(readonly configService: ConfigService) {
+    constructor(readonly configService: ConfigService<EnvironmentVariables>) {
         super({
             jwtFromRequest: ExtractJwt.fromExtractors([
-                AccessTokenStrategy.extractJWT,
+                (req: Request) => req.cookies.access_token as string || null,
                 ExtractJwt.fromAuthHeaderAsBearerToken(),
             ]),
-            secretOrKey: configService.get('JWT_ACCESS_SECRET')!,
+            secretOrKey: configService.getOrThrow('JWT_ACCESS_SECRET'),
         });
     }
 
     validate(payload: JwtPayload) {
         return payload;
-    }
-
-    private static extractJWT(this: void, req: Request) {
-        return req.cookies.access_token as string || null;
     }
 }
