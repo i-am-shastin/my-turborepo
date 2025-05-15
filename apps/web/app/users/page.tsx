@@ -9,24 +9,10 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useUsers } from './users.hook';
 
 export default function UsersPage() {
-    const [users, setUsers] = useState<{ id: number; email: string }[] | null>(null);
-
-    useEffect(() => {
-        async function fetchPosts() {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
-                credentials: 'include',
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setUsers(data);
-            }
-        }
-        fetchPosts();
-    }, []);
+    const { users, isLoading } = useUsers();
 
     return (
         <Card className="w-full max-w-xl mx-auto">
@@ -46,7 +32,7 @@ export default function UsersPage() {
                                 ))}
                             </ul>
                         )
-                    : <div className="text-2xl">Loading...</div>}
+                    : <div className="text-2xl">{isLoading ? 'Loading...' : 'Error'}</div>}
             </CardContent>
             <CardFooter className="flex justify-end gap-4">
                 <Button variant="outline" asChild>

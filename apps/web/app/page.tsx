@@ -1,6 +1,9 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 export default function Home() {
     return (
@@ -20,6 +23,20 @@ export default function Home() {
                     </div>
                 </div>
             </CardContent>
+            <CardFooter className="flex justify-end gap-4">
+                <Button
+                    variant="destructive"
+                    onClick={async function () {
+                        'use server';
+                        (await cookies())
+                            .delete('access_token')
+                            .delete('refresh_token');
+                        redirect('/');
+                    }}
+                >
+                    Log out
+                </Button>
+            </CardFooter>
         </Card>
     );
 }
