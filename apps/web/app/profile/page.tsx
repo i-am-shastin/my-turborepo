@@ -12,7 +12,7 @@ import Link from 'next/link';
 export default async function Profile() {
     const { cookies } = await import('next/headers');
     const cookieManager = await cookies();
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/me`, {
+    const response = await fetch(`${process.env.NEXT_PRIVATE_API_URL}/me`, {
         headers: { Cookie: cookieManager.toString() },
     });
     const user = await response.json();

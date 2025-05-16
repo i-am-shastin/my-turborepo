@@ -23,9 +23,11 @@ WORKDIR /app
 COPY --from=builder /app/out/json/ .
 RUN npm install
 
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 # Build the project
 COPY --from=builder /app/out/full/ .
-
 RUN npx turbo build
 
 FROM base AS runner

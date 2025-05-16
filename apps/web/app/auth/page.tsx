@@ -11,8 +11,6 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { isRedirectError } from 'next/dist/client/components/redirect-error';
-import { redirect } from 'next/navigation';
 import { SyntheticEvent, useState } from 'react';
 
 export default function Auth() {
@@ -35,22 +33,19 @@ export default function Auth() {
             });
 
             if (response.ok) {
-                redirect('/');
+                // Why client action can't use redirect from next/navigation?
+                location.pathname = '/';
+                return;
             }
 
             const data = await response.json();
             setError(data.message);
         }
         catch (error) {
-            if (isRedirectError(error)) {
-                throw error;
+            if (error instanceof Error) {
+                setError(error.message);
             }
-            else {
-                if (error instanceof Error) {
-                    setError(error.message);
-                }
-                console.error(error);
-            }
+            console.error(error);
         }
         finally {
             setIsLoading(false);

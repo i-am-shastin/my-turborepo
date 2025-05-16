@@ -1,58 +1,85 @@
 services:
-  api:
-    container_name: api
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    ports:
-      - "30000:30000"
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:prisma@postgres:5432/postgres?schema=public
-      JWT_ACCESS_SECRET: JYVfuF2Yt336GqcLzE/yXg79mLmRlFLY1lilr+RSL6plwQnMpexIBN79RxHIv4w51dZaiOUIg0iUUcT83hSdugtN7bHnswXRk4SWNAg/sgEVkVYXhhGwsCF47iOCVOVodo8eelk+ux/CehHyArenxe5ogMANNHRttAhDFJSnvtji/j1aps6Oe4UGlNeVZ3qrV6vQOSNWy9TQ0koU8qYc+9OTMzRfFUxT7LWOzLFlpK7RRYPl/9PO7S9o5pDuwyw4HMjKLwz1D1lfCY6Kqpcz2OkjeYLtTmEdC6aHFrpjSdGUBhiIr/FOGIX7etD4E6hkwG7tNeYw99WevHq9i+2rdg==
-      JWT_ACCESS_EXPIRE_SECONDS: 900
-      JWT_REFRESH_SECRET: nezNLCwLV1ULgRksufrf0Gm8kNsH1KAOpC82n/Ft1LzZGhFmTc2kjgBk6HLNMumhDIfIcBHGJGUBhlg7vTaXyl98yxtlvReD+/L0MVQmHNb2wSuxCrZ7zg4EWusPl9TMS/V2n5DWk8LZCkRGsHXFLg2tRDpGVsU//2orPXRht/eIzsZwjl/l6vep26bMqUm+2/h3WtECH+zesm4svAsRecUPbRZ3Ro5K7z1POOHvZg+n44xcR7NToN8s6fIOprd2s6EqgxRxqT/I/3QGDIb0gFQXzlrG+uqZjTzqmSIL7al1tkzh3HottfslRSESyulo5g3ZanGI51F3Zx2iF8ml/Q==
-      JWT_REFRESH_EXPIRE_SECONDS: 604800
-    depends_on:
-      - postgres
-    restart: unless-stopped
-    networks:
-      - app_network
+    api:
+        container_name: api
+        build:
+            context: .
+            dockerfile: apps/api/Dockerfile
+        ports:
+            - "30000:30000"
+        environment:
+            NODE_ENV: production
+            DATABASE_URL: postgresql://postgres:prisma@postgres:5432/postgres?schema=public
+            JWT_ACCESS_SECRET: JYVfuF2Yt336GqcLzE/yXg79mLmRlFLY1lilr+RSL6plwQnMpexIBN79RxHIv4w51dZaiOUIg0iUUcT83hSdugtN7bHnswXRk4SWNAg/sgEVkVYXhhGwsCF47iOCVOVodo8eelk+ux/CehHyArenxe5ogMANNHRttAhDFJSnvtji/j1aps6Oe4UGlNeVZ3qrV6vQOSNWy9TQ0koU8qYc+9OTMzRfFUxT7LWOzLFlpK7RRYPl/9PO7S9o5pDuwyw4HMjKLwz1D1lfCY6Kqpcz2OkjeYLtTmEdC6aHFrpjSdGUBhiIr/FOGIX7etD4E6hkwG7tNeYw99WevHq9i+2rdg==
+            JWT_ACCESS_EXPIRE_SECONDS: 900
+            JWT_REFRESH_SECRET: nezNLCwLV1ULgRksufrf0Gm8kNsH1KAOpC82n/Ft1LzZGhFmTc2kjgBk6HLNMumhDIfIcBHGJGUBhlg7vTaXyl98yxtlvReD+/L0MVQmHNb2wSuxCrZ7zg4EWusPl9TMS/V2n5DWk8LZCkRGsHXFLg2tRDpGVsU//2orPXRht/eIzsZwjl/l6vep26bMqUm+2/h3WtECH+zesm4svAsRecUPbRZ3Ro5K7z1POOHvZg+n44xcR7NToN8s6fIOprd2s6EqgxRxqT/I/3QGDIb0gFQXzlrG+uqZjTzqmSIL7al1tkzh3HottfslRSESyulo5g3ZanGI51F3Zx2iF8ml/Q==
+            JWT_REFRESH_EXPIRE_SECONDS: 604800
+        depends_on:
+            prisma-studio:
+                condition: service_started
+            postgres:
+                condition: service_healthy
+        restart: unless-stopped
+        networks:
+            - app_network
 
-  postgres:
-    container_name: postgres
-    image: postgres:latest
-    restart: unless-stopped
-    environment:
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=prisma
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app_network
+    prisma-studio:
+        container_name: prisma-studio
+        image: node:lts-alpine3.17
+        working_dir: /usr/src/app
+        volumes:
+            - .:/usr/src/app
+        command: sh -c "npx prisma migrate deploy && npx prisma studio --port 5555 --browser none"
+        ports:
+            - "5555:5555"
+        environment:
+            DATABASE_URL: postgresql://postgres:prisma@postgres:5432/postgres?schema=public
+        networks:
+            - app_network
+        depends_on:
+            postgres:
+                condition: service_healthy
 
-  frontend:
-    container_name: web
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://api:30000
-    depends_on:
-      - api
-    restart: unless-stopped
-    networks:
-      - app_network
+    postgres:
+        container_name: postgres
+        image: postgres:latest
+        restart: unless-stopped
+        environment:
+            - POSTGRES_DB=postgres
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=prisma
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        networks:
+            - app_network
+        healthcheck:
+            test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
+            interval: 5s
+            timeout: 2s
+            retries: 20
+
+    frontend:
+        container_name: web
+        build:
+            context: .
+            dockerfile: apps/web/Dockerfile
+            args:
+                - NEXT_PUBLIC_API_URL=http://localhost:30000
+        ports:
+            - "3000:3000"
+        environment:
+            - NEXT_PRIVATE_API_URL=http://api:30000
+        depends_on:
+            - api
+        restart: unless-stopped
+        networks:
+            - app_network
 
 volumes:
-  postgres_data:
+    postgres_data:
 
 
 networks:
-  app_network:
-    external: true
+    app_network:
+        external: true

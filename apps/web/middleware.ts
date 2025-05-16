@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!accessToken && refreshToken) {
-        const refreshResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+        const refreshResponse = await fetch(`${process.env.NEXT_PRIVATE_API_URL}/auth/refresh`, {
             method: 'POST',
             headers: {
                 Cookie: `refresh_token=${refreshToken.value}`,
